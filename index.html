@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<title>Khaled AI</title>
+</head>
+<body>
+<header><h1>🤖 Khaled AI</h1><p>وكيلك الشخصي</p></header>
+
+<main>
+<section id="chat" class="card">
+  <div id="messages">
+    <div class="msg ai">مرحباً خالد 👋 أنا Khaled AI. قل لي ماذا تريد أن أتذكر أو أساعدك فيه.</div>
+  </div>
+  <div class="composer">
+    <input id="userInput" placeholder="اكتب بالعربي، norsk, English أو português...">
+    <button id="sendBtn">إرسال</button>
+  </div>
+</section>
+
+<section class="card">
+<h2>⏰ تذكير جديد</h2>
+<input id="reminderText" placeholder="مثلاً: قطرة العين">
+<input id="reminderTime" type="datetime-local">
+<button id="addReminder">إضافة التذكير</button>
+<div id="reminders"></div>
+</section>
+
+<section class="card">
+<h2>🌍 الترجمة</h2>
+<textarea id="translateInput" placeholder="الصق هنا رسالة من WhatsApp..."></textarea>
+<select id="targetLang">
+<option value="ar">العربية</option>
+<option value="en">English</option>
+<option value="no">Norsk</option>
+<option value="pt">Português</option>
+</select>
+<button id="translateBtn">ترجمة</button>
+<div id="translationResult"></div>
+</section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
