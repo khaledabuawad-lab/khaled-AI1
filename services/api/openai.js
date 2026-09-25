@@ -36,7 +36,7 @@ export async function planAction({
       response: { type: "string" },
       action: {
         type: "string",
-        enum: ["none", "reminder", "send_message", "translate"]
+        enum: ["none", "reminder", "send_message", "translate", "investment"]
       },
       target: { type: ["string", "null"] },
       message: { type: ["string", "null"] },
@@ -62,6 +62,7 @@ Use action=none for ordinary conversation.
 For reminders, put the requested time in reminder_at as an ISO-8601 timestamp when it can be determined from the current context.
 For send_message, target is the person/contact identifier if known and message is the exact intended message.
 For translation, message is the source text and language is the requested target language.
+For investment questions about gold, silver, Bitcoin, crypto, stocks, ETFs, commodities, FX or markets, use action=investment.
 Never claim an external action was completed; you only plan it.
 Current context: ${context}`,
     input,
