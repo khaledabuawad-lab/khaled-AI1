@@ -20,7 +20,7 @@ async function sendMessage(){
   if(p?.action==="investment"){const d=await jsonPost("/v1/investments/analyze",{question:text});pending.textContent=d.answer||p.response;return}
   if(p?.action==="reminder"&&p.reminder_at&&p.message){try{const d=await jsonPost("/v1/reminders",{title:p.message,remind_at:p.reminder_at});reminders.push({id:d.reminder?.id,text:p.message,time:p.reminder_at,done:false});saveReminders()}catch{reminders.push({text:p.message,time:p.reminder_at,done:false});saveReminders()}pending.textContent=p.response||"Reminder saved.";return}
   if(p?.action==="translate"&&p.message){pending.textContent=p.message;return}
-  if(p?.action==="send_message"){pending.textContent="I prepared the message. Sending will be enabled when the corresponding WhatsApp/Apple connection is authorized.";return}
+  if(p?.action==="send_message"){if(p.target){try{const people=await (await fetch(apiBase()+"/v1/people")).json();const person=(people.people||[]).find(x=>x.name.toLowerCase()===String(p.target).toLowerCase()||x.whatsapp_id===p.target||x.phone===p.target);if(person?.whatsapp_id||person?.phone){const d=await jsonPost("/v1/actions/execute",{action:"send_message",to:person.whatsapp_id||person.phone,message:p.message||text});pending.textContent=d.ok?"Message sent successfully via WhatsApp.":"Message could not be sent.";return}}catch{}}pending.textContent="The message is prepared, but the WhatsApp contact connection is not configured yet.";return}
   if(p?.response){pending.textContent=p.response;return}
   const d=await jsonPost("/v1/chat",{text});pending.textContent=d.reply||"I couldn't get a response.";
  }catch(e){pending.textContent="Khaled AI could not complete that request yet: "+e.message}
