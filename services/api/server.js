@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "node:crypto";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
-import { initDb, isDatabaseConfigured, listMemories, addMemory, listReminders, addReminder } from "./db.js";
+import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -73,7 +73,7 @@ app.get("/health", (_req, res) => {
     service: "khaled-ai-api",
     version: "0.3.2",
     aiConfigured: Boolean(process.env.OPENAI_API_KEY),
-    dbConfigured: isDatabaseConfigured(),
+    dbConfigured: isDatabaseConfigured(),\n    dbReady: isDatabaseReady(),
     whatsappConfigured: Boolean(
       process.env.WHATSAPP_ACCESS_TOKEN &&
       process.env.WHATSAPP_PHONE_NUMBER_ID &&
