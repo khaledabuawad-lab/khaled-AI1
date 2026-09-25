@@ -80,6 +80,7 @@ tabs.forEach(tab=>tab.addEventListener('click',()=>{
   });
 }));
 document.querySelectorAll('main > .card').forEach(s=>{if(s.id!=='chat')s.hidden=true});
+document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{const target=tab.dataset.section;if(target==='peopleCard'){document.getElementById('peopleCard').hidden=false}}));
 
 const memoryStore=JSON.parse(localStorage.getItem('khaledMemoryV1')||'[]');
 function renderMemory(){const el=$('memoryList');if(!el)return;el.innerHTML=memoryStore.map(m=>'<div class="reminder">'+m.content+'</div>').join('')}
