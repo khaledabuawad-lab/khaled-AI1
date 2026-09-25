@@ -105,7 +105,49 @@ async function sendMessage() {
   addMessage("…", "ai");
   const messages = $("messages");
   const pending = messages?.lastElementChild;
-  const reply = (await tryLiveChat(text)) || localAssistantReply(text);
+  const plan = await tryAgentPlan(text);
+
+  if (plan?.action === "investment") {
+    const base = localStorage.getItem("khaledApiUrl");
+    let reply = plan.response || "I’m researching the current market data now.";
+    try {
+      const response = await fetch(base.replace(/\/$/, "") + "/v1/investments/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        reply = data.answer || reply;
+      }
+    } catch {}
+    if (pending) pending.textContent = reply;
+    else addMessage(reply, "ai");
+    return;
+  }
+
+  if (plan?.action === "reminder" && plan.reminder_at && plan.message) {
+    reminders.push({ text: plan.message, time: plan.reminder_at, done: false });
+    saveReminders();
+    if (pending) pending.textContent = plan.response || "Reminder saved.";
+    else addMessage(plan.response || "Reminder saved.", "ai");
+    if (Notification?.permission === "default") Notification.requestPermission();
+    return;
+  }
+
+  if (plan?.action === "translate" && plan.message) {
+    if (pending) pending.textContent = plan.message;
+    else addMessage(plan.message, "ai");
+    return;
+  }
+
+  if (plan?.action === "send_message") {
+    if (pending) pending.textContent = "I prepared the message, but I will ask for confirmation before sending it.";
+    else addMessage("I prepared the message, but I will ask for confirmation before sending it.", "ai");
+    return;
+  }
+
+  const reply = plan?.response || (await tryLiveChat(text)) || localAssistantReply(text);
   if (pending) pending.textContent = reply;
   else addMessage(reply, "ai");
 }
