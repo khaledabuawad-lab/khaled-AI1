@@ -88,10 +88,12 @@ app.post("/v1/chat", async (req, res) => {
   if (!text) return res.status(400).json({ error: "text is required" });
 
   try {
+    const memories = await listMemories(50);
+    const memoryContext = memories.map((m) => `- ${m.content}`).join("\n") || "none";
     const reply = await askOpenAI({
       input: text,
       instructions:
-        "You are Khaled AI, a personal assistant. Detect and respond naturally in the user's language. Supported languages include Arabic, Norwegian, English and Brazilian Portuguese. Be concise, helpful and context-aware. Never claim to have accessed a service unless the integration actually supplied the data."
+        "You are Khaled AI, a personal assistant. Detect and respond naturally in the user's language. Supported languages include Arabic, Norwegian, English and Brazilian Portuguese. Be concise, helpful and context-aware. Never claim to have accessed a service unless the integration actually supplied the data.\nRelevant persistent memory:\n${memoryContext}"
     });
     res.json({ reply });
   } catch (error) {
@@ -108,7 +110,7 @@ app.post("/v1/agent/plan", async (req, res) => {
   if (!text) return res.status(400).json({ error: "text is required" });
 
   try {
-    const plan = await planAction({ input: text, context });
+    const memories = await listMemories(50);\n    const memoryContext = memories.map((m) => `- ${m.content}`).join("\n") || "none";\n    const plan = await planAction({ input: text, context: `${context}\nPersistent memory:\n${memoryContext}` });
     res.json({ plan });
   } catch (error) {
     const message = String(error?.message || error);
