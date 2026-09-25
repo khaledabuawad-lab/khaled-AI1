@@ -65,6 +65,7 @@ function assistantReply(text){
   return replies[lang];
 }
 const originalSend=$('sendBtn').onclick;
+async function callKhaledAPI(text){return null;}
 $('sendBtn').onclick=()=>{
   const text=$('userInput').value.trim(); if(!text)return;
   addMessage(text,'user'); $('userInput').value='';
