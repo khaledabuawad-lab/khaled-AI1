@@ -67,7 +67,14 @@ function verifyWhatsAppSignature(req) {
 }
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "khaled-ai-api", version: "0.4.0" });
+  res.json({
+    ok: true,
+    service: "khaled-ai-api",
+    version: "0.4.1",
+    aiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    dbConfigured: isDatabaseConfigured(),
+    dbReady: isDatabaseReady()
+  });
 });
 
 app.get("/ready", (_req, res) => {
