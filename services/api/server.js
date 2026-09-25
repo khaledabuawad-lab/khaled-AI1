@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "node:crypto";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
 
@@ -58,7 +59,6 @@ function verifyWhatsAppSignature(req) {
   if (!secret) return false;
   const signature = req.get("x-hub-signature-256") || "";
   if (!signature.startsWith("sha256=") || !req.rawBody) return false;
-  const crypto = require("node:crypto");
   const expected = "sha256=" + crypto
     .createHmac("sha256", secret)
     .update(req.rawBody)
