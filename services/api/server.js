@@ -128,6 +128,17 @@ ${memoryContext}` });
   }
 });
 
+app.post("/v1/actions/execute", async (req,res)=>{
+  const action=String(req.body?.action||"");
+  if(action==="send_message"){
+    const to=String(req.body?.to||"").trim(); const message=String(req.body?.message||"").trim();
+    if(!to||!message)return res.status(400).json({error:"to and message are required"});
+    try{ const result=await sendWhatsAppText(to,message); return res.json({ok:true,channel:"whatsapp",result}); }
+    catch(error){ return res.status(502).json({error:String(error?.message||error)}); }
+  }
+  return res.status(400).json({error:"Unsupported action"});
+});
+
 app.post("/v1/investments/analyze", async (req, res) => {
   const question = String(req.body?.question || "").trim();
   const portfolio = String(req.body?.portfolio || "").trim();
