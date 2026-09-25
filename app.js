@@ -46,3 +46,14 @@ $('translateBtn').onclick=()=>{
 renderReminders();
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+
+const tabs=[...document.querySelectorAll('.tab')];
+tabs.forEach(tab=>tab.addEventListener('click',()=>{
+  tabs.forEach(t=>t.classList.remove('active')); tab.classList.add('active');
+  const target=tab.dataset.section;
+  document.querySelectorAll('main > .card').forEach(s=>{
+    if(s.id==='chat') s.hidden=target!=='chat';
+    else s.hidden=s.id!==target;
+  });
+}));
+document.querySelectorAll('main > .card').forEach(s=>{if(s.id!=='chat')s.hidden=true});
