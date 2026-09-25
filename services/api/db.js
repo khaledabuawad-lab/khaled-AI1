@@ -2,7 +2,8 @@ import pg from "pg";
 
 const { Pool } = pg;
 
-let pool = null;\nlet ready = false;
+let pool = null;
+let ready = false;
 
 function getPool() {
   if (!process.env.DATABASE_URL) return null;
@@ -58,7 +59,8 @@ export async function initDb() {
     CREATE INDEX IF NOT EXISTS reminders_status_time_idx ON reminders(status, remind_at);
   `);
 
-  ready = true;\n  return true;
+  ready = true;
+  return true;
 }
 
 export async function listMemories(limit = 100) {
@@ -102,7 +104,9 @@ export async function addReminder({ title, remindAt = null }) {
   );
   return rows[0];
 }
-\nexport function isDatabaseReady() { return ready; }\n
+
+export function isDatabaseReady() { return ready; }
+
 export async function addPerson({ name, phone = null, whatsappId = null, notes = null }) {
   const db = getPool(); if (!db) throw new Error("DATABASE_URL is not configured");
   const { rows } = await db.query("INSERT INTO people (name, phone, whatsapp_id, notes) VALUES ($1,$2,$3,$4) RETURNING id,name,phone,whatsapp_id,notes,created_at,updated_at",[name,phone,whatsappId,notes]); return rows[0];
