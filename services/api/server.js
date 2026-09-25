@@ -70,7 +70,7 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     service: "khaled-ai-api",
-    version: "0.3.1",
+    version: "0.3.2",
     aiConfigured: Boolean(process.env.OPENAI_API_KEY),
     whatsappConfigured: Boolean(
       process.env.WHATSAPP_ACCESS_TOKEN &&
