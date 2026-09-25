@@ -1,0 +1,11 @@
+{
+  "entities": {
+    "person": ["id","displayName","aliases","preferredLanguage","notes"],
+    "conversation": ["id","channel","externalId","personId","status","lastMessageAt"],
+    "message": ["id","conversationId","direction","text","externalId","sentAt","status"],
+    "reminder": ["id","text","dueAt","timezone","status","source"],
+    "memory": ["id","personId","content","importance","createdAt","expiresAt"],
+    "integrationAccount": ["id","provider","status","externalAccountId"],
+    "action": ["id","type","status","createdAt","completedAt"]
+  }
+}
