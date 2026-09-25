@@ -87,3 +87,14 @@ const memoryStore=JSON.parse(localStorage.getItem('khaledMemoryV1')||'[]');
 function renderMemory(){const el=$('memoryList');if(!el)return;el.innerHTML=memoryStore.map(m=>'<div class="reminder">'+m.content+'</div>').join('')}
 if($('saveMemory'))$('saveMemory').onclick=()=>{const text=$('memoryInput').value.trim();if(!text)return;memoryStore.push({id:crypto.randomUUID(),content:text,createdAt:new Date().toISOString()});localStorage.setItem('khaledMemoryV1',JSON.stringify(memoryStore));$('memoryInput').value='';renderMemory()};
 renderMemory();
+
+async function tryLiveChat(text){
+  try{
+    const base=localStorage.getItem("khaledApiUrl");
+    if(!base) return null;
+    const r=await fetch(base.replace(/\/$/,'')+"/v1/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+    if(!r.ok)return null;
+    const data=await r.json();
+    return data.reply||data.message||null;
+  }catch{return null}
+}
