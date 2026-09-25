@@ -73,7 +73,8 @@ app.get("/health", (_req, res) => {
     service: "khaled-ai-api",
     version: "0.3.2",
     aiConfigured: Boolean(process.env.OPENAI_API_KEY),
-    dbConfigured: isDatabaseConfigured(),\n    dbReady: isDatabaseReady(),
+    dbConfigured: isDatabaseConfigured(),
+    dbReady: isDatabaseReady(),
     whatsappConfigured: Boolean(
       process.env.WHATSAPP_ACCESS_TOKEN &&
       process.env.WHATSAPP_PHONE_NUMBER_ID &&
@@ -89,11 +90,14 @@ app.post("/v1/chat", async (req, res) => {
 
   try {
     const memories = await listMemories(50);
-    const memoryContext = memories.map((m) => `- ${m.content}`).join("\n") || "none";
+    const memoryContext = memories.map((m) => `- ${m.content}`).join("
+") || "none";
     const reply = await askOpenAI({
       input: text,
       instructions:
-        "You are Khaled AI, a personal assistant. Detect and respond naturally in the user's language. Supported languages include Arabic, Norwegian, English and Brazilian Portuguese. Be concise, helpful and context-aware. Never claim to have accessed a service unless the integration actually supplied the data.\nRelevant persistent memory:\n${memoryContext}"
+        "You are Khaled AI, a personal assistant. Detect and respond naturally in the user's language. Supported languages include Arabic, Norwegian, English and Brazilian Portuguese. Be concise, helpful and context-aware. Never claim to have accessed a service unless the integration actually supplied the data.
+Relevant persistent memory:
+${memoryContext}"
     });
     res.json({ reply });
   } catch (error) {
@@ -110,7 +114,12 @@ app.post("/v1/agent/plan", async (req, res) => {
   if (!text) return res.status(400).json({ error: "text is required" });
 
   try {
-    const memories = await listMemories(50);\n    const memoryContext = memories.map((m) => `- ${m.content}`).join("\n") || "none";\n    const plan = await planAction({ input: text, context: `${context}\nPersistent memory:\n${memoryContext}` });
+    const memories = await listMemories(50);
+    const memoryContext = memories.map((m) => `- ${m.content}`).join("
+") || "none";
+    const plan = await planAction({ input: text, context: `${context}
+Persistent memory:
+${memoryContext}` });
     res.json({ plan });
   } catch (error) {
     const message = String(error?.message || error);
