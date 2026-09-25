@@ -2,7 +2,7 @@ import pg from "pg";
 
 const { Pool } = pg;
 
-let pool = null;
+let pool = null;\nlet ready = false;
 
 function getPool() {
   if (!process.env.DATABASE_URL) return null;
@@ -46,7 +46,7 @@ export async function initDb() {
     CREATE INDEX IF NOT EXISTS reminders_status_time_idx ON reminders(status, remind_at);
   `);
 
-  return true;
+  ready = true;\n  return true;
 }
 
 export async function listMemories(limit = 100) {
@@ -90,3 +90,4 @@ export async function addReminder({ title, remindAt = null }) {
   );
   return rows[0];
 }
+\nexport function isDatabaseReady() { return ready; }\n
