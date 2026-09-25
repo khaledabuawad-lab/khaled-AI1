@@ -1,49 +1,103 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#111111">
+<meta name="theme-color" content="#0b0d10">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="style.css">
 <title>Khaled AI</title>
 </head>
 <body>
-<header><h1>🤖 Khaled AI</h1><p>وكيلك الشخصي</p></header>
+<header class="topbar">
+  <div>
+    <div class="brand"><span class="brand-dot"></span>Khaled AI</div>
+    <div class="subtitle">Your private personal AI</div>
+  </div>
+  <div id="connectionBadge" class="badge">Checking…</div>
+</header>
 
-<nav class="tabs" aria-label="Khaled AI sections"><button class="tab active" data-section="chat">Assistant</button><button class="tab" data-section="reminderCard">Reminders</button><button class="tab" data-section="translateCard">Translate</button><button class="tab" data-section="peopleCard">People</button><button class="tab" data-section="settingsCard">Settings</button><button class="tab" data-section="integrationsCard">Integrations</button></nav>\n\n<main>
-<section id="chat" class="card">
-  <div id="messages">
-    <div class="msg ai">مرحباً خالد 👋 أنا Khaled AI. قل لي ماذا تريد أن أتذكر أو أساعدك فيه.</div>
+<nav class="tabs" aria-label="Khaled AI sections">
+  <button class="tab active" data-section="chat">Assistant</button>
+  <button class="tab" data-section="reminderCard">Reminders</button>
+  <button class="tab" data-section="investmentCard">Investments</button>
+  <button class="tab" data-section="translateCard">Translate</button>
+  <button class="tab" data-section="memoryCard">Memory</button>
+  <button class="tab" data-section="integrationsCard">Connections</button>
+  <button class="tab" data-section="settingsCard">Settings</button>
+</nav>
+
+<main>
+<section id="chat" class="card hero-card">
+  <div class="section-head"><div><span class="eyebrow">PERSONAL ASSISTANT</span><h2>What can I do for you?</h2></div></div>
+  <div id="messages" aria-live="polite">
+    <div class="msg ai"><strong>Khaled AI</strong><br>Hi Khaled 👋 I can understand Arabic, Norwegian, English and Brazilian Portuguese. Ask me anything, create a reminder, translate something, or ask about markets.</div>
   </div>
   <div class="composer">
-    <input id="userInput" placeholder="اكتب بالعربي، norsk, English أو português...">
-    <button id="sendBtn">إرسال</button>
+    <input id="userInput" autocomplete="off" placeholder="Ask Khaled AI anything…">
+    <button id="sendBtn" aria-label="Send">Send</button>
+  </div>
+  <div class="quick-actions">
+    <button data-prompt="What is happening with gold today?">Gold</button>
+    <button data-prompt="What is happening with Bitcoin today?">Bitcoin</button>
+    <button data-prompt="Remind me tomorrow at 10:00 to call Jessica">Reminder</button>
+    <button data-prompt="Translate this naturally to Brazilian Portuguese: I miss you">PT-BR</button>
   </div>
 </section>
 
-<section class="card">
-<h2>⏰ تذكير جديد</h2>
-<input id="reminderText" placeholder="مثلاً: قطرة العين">
-<input id="reminderTime" type="datetime-local">
-<button id="addReminder">إضافة التذكير</button>
-<div id="reminders"></div>
+<section id="reminderCard" class="card" hidden>
+  <div class="section-head"><div><span class="eyebrow">ROUTINES</span><h2>Reminders</h2></div></div>
+  <input id="reminderText" placeholder="What should I remember?">
+  <input id="reminderTime" type="datetime-local">
+  <button id="addReminder">Add reminder</button>
+  <div id="reminders" class="list"></div>
 </section>
 
-<section class="card">
-<h2>🌍 الترجمة</h2>
-<textarea id="translateInput" placeholder="الصق هنا رسالة من WhatsApp..."></textarea>
-<select id="targetLang">
-<option value="ar">العربية</option>
-<option value="en">English</option>
-<option value="no">Norsk</option>
-<option value="pt">Português</option>
-</select>
-<button id="translateBtn">ترجمة</button>
-<div id="translationResult"></div>
+<section id="investmentCard" class="card" hidden>
+  <div class="section-head"><div><span class="eyebrow">MARKET INTELLIGENCE</span><h2>Investments</h2></div></div>
+  <p class="muted">Ask Khaled AI for current analysis of gold, silver, Bitcoin, crypto, stocks, ETFs, commodities, FX, rates and macroeconomics. Current-data answers are generated from live web research when the backend is configured.</p>
+  <div class="asset-grid">
+    <button data-prompt="Give me a current market briefing on gold and silver. Include price, drivers, risks and scenarios.">Gold & Silver</button>
+    <button data-prompt="Give me a current Bitcoin briefing with price, major news, macro drivers, risks and scenarios.">Bitcoin</button>
+    <button data-prompt="Give me a current overview of stocks and ETFs that I should research, with sectors, risks and macro factors.">Stocks & ETFs</button>
+    <button data-prompt="Give me a current macro briefing: rates, inflation, USD, commodities and crypto.">Macro</button>
+  </div>
+</section>
+
+<section id="translateCard" class="card" hidden>
+  <div class="section-head"><div><span class="eyebrow">LANGUAGES</span><h2>Translator</h2></div></div>
+  <textarea id="translateInput" placeholder="Enter text…"></textarea>
+  <select id="targetLang">
+    <option value="pt">Brazilian Portuguese</option>
+    <option value="ar">Arabic</option>
+    <option value="en">English</option>
+    <option value="no">Norwegian</option>
+  </select>
+  <button id="translateBtn">Translate</button>
+  <div id="translationResult" class="result"></div>
+</section>
+
+<section id="memoryCard" class="card" hidden>
+  <div class="section-head"><div><span class="eyebrow">CONTEXT</span><h2>Memory</h2></div></div>
+  <div class="memory-add"><input id="memoryInput" placeholder="Something Khaled AI should remember…"><button id="saveMemory">Save</button></div>
+  <div id="memoryList" class="list"></div>
+</section>
+
+<section id="integrationsCard" class="card" hidden>
+  <div class="section-head"><div><span class="eyebrow">CONNECTIONS</span><h2>Integrations</h2></div></div>
+  <div class="integration"><div><strong>OpenAI</strong><span>AI brain</span></div><b id="aiIntegration">Checking</b></div>
+  <div class="integration"><div><strong>WhatsApp</strong><span>Official Business Platform adapter</span></div><b>Server setup</b></div>
+  <div class="integration"><div><strong>iMessage</strong><span>Apple-side bridge required for autonomous inbox access</span></div><b>Bridge</b></div>
+</section>
+
+<section id="settingsCard" class="card" hidden>
+  <div class="section-head"><div><span class="eyebrow">SYSTEM</span><h2>Settings</h2></div></div>
+  <label>API server</label>
+  <input id="apiUrl" inputmode="url">
+  <button id="saveApiUrl">Save connection</button>
+  <div id="apiStatus" class="muted"></div>
 </section>
 </main>
-
 <script src="app.js"></script>
 </body>
 </html>
