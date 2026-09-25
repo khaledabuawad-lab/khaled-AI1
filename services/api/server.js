@@ -1,7 +1,7 @@
 import express from "express";
 import {askOpenAI} from "./openai.js";
 const app=express();
-app.use(express.json({limit:"1mb"}));
+app.use((req,res,next)=>{res.setHeader("Access-Control-Allow-Origin","*");res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");if(req.method==="OPTIONS")return res.sendStatus(204);next();});\napp.use(express.json({limit:"1mb"}));
 const port=process.env.PORT||3000;
 
 app.get("/health",(_,res)=>res.json({ok:true,service:"khaled-ai-api",version:"0.2.0",aiConfigured:Boolean(process.env.OPENAI_API_KEY)}));
@@ -21,5 +21,5 @@ app.post("/v1/chat",async(req,res)=>{
   }
 });
 
-app.post("/v1/webhooks/whatsapp",(req,res)=>res.status(501).json({error:"WhatsApp credentials/webhook configuration required"}));
+app.get("/v1/webhooks/whatsapp",(req,res)=>{const mode=req.query["hub.mode"],token=req.query["hub.verify_token"],challenge=req.query["hub.challenge"];if(mode==="subscribe"&&token&&token===process.env.WHATSAPP_VERIFY_TOKEN)return res.status(200).send(challenge);return res.sendStatus(403);});\napp.post("/v1/webhooks/whatsapp",(req,res)=>{res.sendStatus(200);});
 app.listen(port,()=>console.log("Khaled AI API listening on "+port));
