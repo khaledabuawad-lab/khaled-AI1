@@ -47,7 +47,30 @@ renderReminders();
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 
-const tabs=[...document.querySelectorAll('.tab')];
+
+function detectLanguage(text){
+  if(/[\u0600-\u06FF]/.test(text)) return 'ar';
+  if(/[ãõçáéíóúâêô]/i.test(text)) return 'pt';
+  if(/\b(og|jeg|du|ikke|hva|det|skal|har)\b/i.test(text)) return 'no';
+  return 'en';
+}
+function assistantReply(text){
+  const lang=detectLanguage(text);
+  const replies={
+    ar:'فهمت. أنا Khaled AI، وسأتعامل مع اللغة والسياق تلقائياً.',
+    pt:'Entendi. Eu sou o Khaled AI e vou lidar automaticamente com o idioma e o contexto.',
+    no:'Jeg forstår. Jeg er Khaled AI og håndterer språk og kontekst automatisk.',
+    en:'I understand. I’m Khaled AI, and I’ll handle the language and context automatically.'
+  };
+  return replies[lang];
+}
+const originalSend=$('sendBtn').onclick;
+$('sendBtn').onclick=()=>{
+  const text=$('userInput').value.trim(); if(!text)return;
+  addMessage(text,'user'); $('userInput').value='';
+  addMessage(assistantReply(text));
+};
+\nconst tabs=[...document.querySelectorAll('.tab')];
 tabs.forEach(tab=>tab.addEventListener('click',()=>{
   tabs.forEach(t=>t.classList.remove('active')); tab.classList.add('active');
   const target=tab.dataset.section;
