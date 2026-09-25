@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "node:crypto";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
-import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder } from "./db.js";
+import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -143,6 +143,9 @@ app.post("/v1/investments/analyze", async (req, res) => {
     res.status(status).json({ error: message });
   }
 });
+
+app.get("/v1/people", async (_req,res)=>{ try{res.json({people:await listPeople()});}catch(error){res.status(503).json({error:String(error?.message||error)});} });
+app.post("/v1/people", async (req,res)=>{ const name=String(req.body?.name||"").trim(); if(!name)return res.status(400).json({error:"name is required"}); try{res.status(201).json({person:await addPerson({name,phone:req.body?.phone||null,whatsappId:req.body?.whatsapp_id||null,notes:req.body?.notes||null})});}catch(error){res.status(503).json({error:String(error?.message||error)});} });
 
 app.get("/v1/memories", async (_req, res) => {
   try {
