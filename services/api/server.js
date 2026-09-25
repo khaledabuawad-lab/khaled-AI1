@@ -46,7 +46,25 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({
+  limit: "1mb",
+  verify: (req, _res, buf) => {
+    req.rawBody = Buffer.from(buf);
+  }
+}));
+
+function verifyWhatsAppSignature(req) {
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret) return false;
+  const signature = req.get("x-hub-signature-256") || "";
+  if (!signature.startsWith("sha256=") || !req.rawBody) return false;
+  const crypto = require("node:crypto");
+  const expected = "sha256=" + crypto
+    .createHmac("sha256", secret)
+    .update(req.rawBody)
+    .digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -57,7 +75,8 @@ app.get("/health", (_req, res) => {
     whatsappConfigured: Boolean(
       process.env.WHATSAPP_ACCESS_TOKEN &&
       process.env.WHATSAPP_PHONE_NUMBER_ID &&
-      process.env.WHATSAPP_VERIFY_TOKEN
+      process.env.WHATSAPP_VERIFY_TOKEN &&
+      process.env.WHATSAPP_APP_SECRET
     )
   });
 });
@@ -129,6 +148,10 @@ app.get("/v1/webhooks/whatsapp", (req, res) => {
 });
 
 app.post("/v1/webhooks/whatsapp", async (req, res) => {
+  if (!verifyWhatsAppSignature(req)) {
+    return res.sendStatus(401);
+  }
+
   // Acknowledge Meta quickly, then process inbound text messages.
   res.sendStatus(200);
 
