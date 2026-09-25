@@ -18,7 +18,7 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     service: "khaled-ai-api",
-    version: "0.3.0",
+    version: "0.3.1",
     aiConfigured: Boolean(process.env.OPENAI_API_KEY)
   });
 });
@@ -62,6 +62,6 @@ app.post("/v1/webhooks/whatsapp", (req, res) => {
   res.sendStatus(200);
 });
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log("Khaled AI API listening on " + port);
 });
