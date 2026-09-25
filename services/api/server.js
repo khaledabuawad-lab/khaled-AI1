@@ -112,8 +112,7 @@ app.post("/v1/agent/plan", async (req, res) => {
 
   try {
     const memories = await listMemories(50);
-    const memoryContext = memories.map((m) => `- ${m.content}`).join("
-") || "none";
+    const memoryContext = memories.map((m) => `- ${m.content}`).join("\n") || "none";
     const plan = await planAction({ input: text, context: `${context}\nPersistent memory:\n${memoryContext}` });
     res.json({ plan });
   } catch (error) {
