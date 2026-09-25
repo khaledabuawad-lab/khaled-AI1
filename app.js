@@ -98,3 +98,5 @@ async function tryLiveChat(text){
     return data.reply||data.message||null;
   }catch{return null}
 }
+
+if($('apiUrl')){ $('apiUrl').value=localStorage.getItem("khaledApiUrl")||""; $('saveApiUrl').onclick=()=>{const v=$('apiUrl').value.trim().replace(/\/$/,'');if(v)localStorage.setItem("khaledApiUrl",v);else localStorage.removeItem("khaledApiUrl");$('apiStatus').textContent=v?"Saved.":"Local API connection removed.";}; }
