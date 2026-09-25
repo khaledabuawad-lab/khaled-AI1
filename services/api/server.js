@@ -79,7 +79,8 @@ app.post("/v1/chat", async (req, res) => {
   }
 });
 
-\napp.post("/v1/agent/plan", async (req, res) => {
+
+app.post("/v1/agent/plan", async (req, res) => {
   const text = String(req.body?.text || "").trim();
   const context = String(req.body?.context || "").trim();
   if (!text) return res.status(400).json({ error: "text is required" });
@@ -93,7 +94,8 @@ app.post("/v1/chat", async (req, res) => {
     res.status(status).json({ error: message });
   }
 });
-\napp.get("/v1/webhooks/whatsapp", (req, res) => {
+
+app.get("/v1/webhooks/whatsapp", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
