@@ -1,5 +1,5 @@
 import express from "express";
-import { askOpenAI } from "./openai.js";
+import { askOpenAI, planAction } from "./openai.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -79,7 +79,21 @@ app.post("/v1/chat", async (req, res) => {
   }
 });
 
-app.get("/v1/webhooks/whatsapp", (req, res) => {
+\napp.post("/v1/agent/plan", async (req, res) => {
+  const text = String(req.body?.text || "").trim();
+  const context = String(req.body?.context || "").trim();
+  if (!text) return res.status(400).json({ error: "text is required" });
+
+  try {
+    const plan = await planAction({ input: text, context });
+    res.json({ plan });
+  } catch (error) {
+    const message = String(error?.message || error);
+    const status = message.includes("OPENAI_API_KEY") ? 503 : 502;
+    res.status(status).json({ error: message });
+  }
+});
+\napp.get("/v1/webhooks/whatsapp", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
