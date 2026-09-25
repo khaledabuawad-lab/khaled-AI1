@@ -52,7 +52,12 @@ app.get("/health", (_req, res) => {
     ok: true,
     service: "khaled-ai-api",
     version: "0.3.1",
-    aiConfigured: Boolean(process.env.OPENAI_API_KEY)
+    aiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    whatsappConfigured: Boolean(
+      process.env.WHATSAPP_ACCESS_TOKEN &&
+      process.env.WHATSAPP_PHONE_NUMBER_ID &&
+      process.env.WHATSAPP_VERIFY_TOKEN
+    )
   });
 });
 
