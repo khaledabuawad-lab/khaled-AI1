@@ -2,6 +2,7 @@ import express from "express";
 import crypto from "node:crypto";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
+import { initDb, isDatabaseConfigured, listMemories, addMemory, listReminders, addReminder } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -72,6 +73,7 @@ app.get("/health", (_req, res) => {
     service: "khaled-ai-api",
     version: "0.3.2",
     aiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    dbConfigured: isDatabaseConfigured(),
     whatsappConfigured: Boolean(
       process.env.WHATSAPP_ACCESS_TOKEN &&
       process.env.WHATSAPP_PHONE_NUMBER_ID &&
@@ -131,6 +133,44 @@ app.post("/v1/investments/analyze", async (req, res) => {
   }
 });
 
+app.get("/v1/memories", async (_req, res) => {
+  try {
+    res.json({ memories: await listMemories() });
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/v1/memories", async (req, res) => {
+  const content = String(req.body?.content || "").trim();
+  const category = String(req.body?.category || "general").trim() || "general";
+  if (!content) return res.status(400).json({ error: "content is required" });
+  try {
+    res.status(201).json({ memory: await addMemory({ content, category }) });
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
+  }
+});
+
+app.get("/v1/reminders", async (_req, res) => {
+  try {
+    res.json({ reminders: await listReminders() });
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/v1/reminders", async (req, res) => {
+  const title = String(req.body?.title || "").trim();
+  const remindAt = req.body?.remind_at ? String(req.body.remind_at) : null;
+  if (!title) return res.status(400).json({ error: "title is required" });
+  try {
+    res.status(201).json({ reminder: await addReminder({ title, remindAt }) });
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
+  }
+});
+
 app.get("/v1/webhooks/whatsapp", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -180,6 +220,8 @@ app.post("/v1/webhooks/whatsapp", async (req, res) => {
     console.error("WhatsApp webhook processing failed:", error);
   }
 });
+
+initDb().then(() => console.log("Khaled AI database ready")).catch((error) => console.error("Khaled AI database init failed:", error));
 
 app.listen(port, "0.0.0.0", () => {
   console.log("Khaled AI API listening on " + port);
