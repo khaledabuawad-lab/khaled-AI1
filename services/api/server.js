@@ -5,7 +5,7 @@ import { analyzeInvestment } from "./investments.js";
 import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson } from "./db.js";
 
 const app = express();
-const port = Number(process.env.PORT || 3000);
+const port = Number(process.env.PORT || 3000);\nconst API_TOKEN = process.env.KHALED_API_TOKEN || "";\n\nfunction requireApiAuth(req, res, next) {\n  if (!API_TOKEN) return res.status(503).json({ error: "Khaled AI API authentication is not configured" });\n  const header = req.get("authorization") || "";\n  if (header !== `Bearer ${API_TOKEN}`) return res.sendStatus(401);\n  next();\n}
 
 function getWhatsAppConfig() {
   return {
@@ -84,7 +84,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.post("/v1/chat", async (req, res) => {
+app.post("/v1/chat", requireApiAuth, async (req, res) => {
   const text = String(req.body?.text || "").trim();
   if (!text) return res.status(400).json({ error: "text is required" });
 
@@ -105,7 +105,7 @@ app.post("/v1/chat", async (req, res) => {
 });
 
 
-app.post("/v1/agent/plan", async (req, res) => {
+app.post("/v1/agent/plan", requireApiAuth, async (req, res) => {
   const text = String(req.body?.text || "").trim();
   const context = String(req.body?.context || "").trim();
   if (!text) return res.status(400).json({ error: "text is required" });
@@ -122,7 +122,7 @@ app.post("/v1/agent/plan", async (req, res) => {
   }
 });
 
-app.post("/v1/actions/execute", async (req,res)=>{
+app.post("/v1/actions/execute", requireApiAuth, async (req,res)=>{
   const action=String(req.body?.action||"");
   if(action==="send_message"){
     const to=String(req.body?.to||"").trim(); const message=String(req.body?.message||"").trim();
@@ -133,7 +133,7 @@ app.post("/v1/actions/execute", async (req,res)=>{
   return res.status(400).json({error:"Unsupported action"});
 });
 
-app.post("/v1/investments/analyze", async (req, res) => {
+app.post("/v1/investments/analyze", requireApiAuth, async (req, res) => {
   const question = String(req.body?.question || "").trim();
   const portfolio = String(req.body?.portfolio || "").trim();
   const watchlist = String(req.body?.watchlist || "").trim();
@@ -149,10 +149,10 @@ app.post("/v1/investments/analyze", async (req, res) => {
   }
 });
 
-app.get("/v1/people", async (_req,res)=>{ try{res.json({people:await listPeople()});}catch(error){res.status(503).json({error:String(error?.message||error)});} });
-app.post("/v1/people", async (req,res)=>{ const name=String(req.body?.name||"").trim(); if(!name)return res.status(400).json({error:"name is required"}); try{res.status(201).json({person:await addPerson({name,phone:req.body?.phone||null,whatsappId:req.body?.whatsapp_id||null,notes:req.body?.notes||null})});}catch(error){res.status(503).json({error:String(error?.message||error)});} });
+app.get("/v1/people", requireApiAuth, async (_req,res)=>{ try{res.json({people:await listPeople()});}catch(error){res.status(503).json({error:String(error?.message||error)});} });
+app.post("/v1/people", requireApiAuth, async (req,res)=>{ const name=String(req.body?.name||"").trim(); if(!name)return res.status(400).json({error:"name is required"}); try{res.status(201).json({person:await addPerson({name,phone:req.body?.phone||null,whatsappId:req.body?.whatsapp_id||null,notes:req.body?.notes||null})});}catch(error){res.status(503).json({error:String(error?.message||error)});} });
 
-app.get("/v1/memories", async (_req, res) => {
+app.get("/v1/memories", requireApiAuth, async (_req, res) => {
   try {
     res.json({ memories: await listMemories() });
   } catch (error) {
@@ -160,7 +160,7 @@ app.get("/v1/memories", async (_req, res) => {
   }
 });
 
-app.post("/v1/memories", async (req, res) => {
+app.post("/v1/memories", requireApiAuth, async (req, res) => {
   const content = String(req.body?.content || "").trim();
   const category = String(req.body?.category || "general").trim() || "general";
   if (!content) return res.status(400).json({ error: "content is required" });
@@ -171,7 +171,7 @@ app.post("/v1/memories", async (req, res) => {
   }
 });
 
-app.get("/v1/reminders", async (_req, res) => {
+app.get("/v1/reminders", requireApiAuth, async (_req, res) => {
   try {
     res.json({ reminders: await listReminders() });
   } catch (error) {
@@ -179,7 +179,7 @@ app.get("/v1/reminders", async (_req, res) => {
   }
 });
 
-app.post("/v1/reminders", async (req, res) => {
+app.post("/v1/reminders", requireApiAuth, async (req, res) => {
   const title = String(req.body?.title || "").trim();
   const remindAt = req.body?.remind_at ? String(req.body.remind_at) : null;
   if (!title) return res.status(400).json({ error: "title is required" });
