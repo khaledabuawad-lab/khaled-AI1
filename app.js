@@ -79,6 +79,23 @@ async function tryLiveChat(text) {
   }
 }
 
+async function tryAgentPlan(text) {
+  try {
+    const base = localStorage.getItem("khaledApiUrl");
+    if (!base) return null;
+    const response = await fetch(base.replace(/\/$/, "") + "/v1/agent/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, context: "Current local time: " + new Date().toISOString() })
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.plan || null;
+  } catch {
+    return null;
+  }
+}
+
 async function sendMessage() {
   const input = $("userInput");
   const text = input?.value.trim();
