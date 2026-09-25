@@ -34,6 +34,18 @@ export async function initDb() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS people (
+      id BIGSERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT,
+      whatsapp_id TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS people_whatsapp_id_idx ON people(whatsapp_id) WHERE whatsapp_id IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS reminders (
       id BIGSERIAL PRIMARY KEY,
       title TEXT NOT NULL,
@@ -91,3 +103,11 @@ export async function addReminder({ title, remindAt = null }) {
   return rows[0];
 }
 \nexport function isDatabaseReady() { return ready; }\n
+export async function addPerson({ name, phone = null, whatsappId = null, notes = null }) {
+  const db = getPool(); if (!db) throw new Error("DATABASE_URL is not configured");
+  const { rows } = await db.query("INSERT INTO people (name, phone, whatsapp_id, notes) VALUES ($1,$2,$3,$4) RETURNING id,name,phone,whatsapp_id,notes,created_at,updated_at",[name,phone,whatsappId,notes]); return rows[0];
+}
+export async function listPeople(limit=100) {
+  const db=getPool(); if(!db) return []; const safeLimit=Math.min(Math.max(Number(limit)||100,1),500);
+  const {rows}=await db.query("SELECT id,name,phone,whatsapp_id,notes,created_at,updated_at FROM people ORDER BY name ASC LIMIT $1",[safeLimit]); return rows;
+}
