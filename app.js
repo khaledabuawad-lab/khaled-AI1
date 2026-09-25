@@ -1,245 +1,35 @@
-const $ = (id) => document.getElementById(id);
+const $=id=>document.getElementById(id);
+const API_KEY="khaledApiUrl";
+let reminders=JSON.parse(localStorage.getItem("khaledReminders")||"[]");
+let memoryStore=JSON.parse(localStorage.getItem("khaledMemoryV1")||"[]");
 
-let reminders = JSON.parse(localStorage.getItem("khaledReminders") || "[]");
-const memoryStore = JSON.parse(localStorage.getItem("khaledMemoryV1") || "[]");
-
-function saveReminders() {
-  localStorage.setItem("khaledReminders", JSON.stringify(reminders));
-  renderReminders();
+function apiBase(){return (localStorage.getItem(API_KEY)||"https://khaled-ai-api.onrender.com").replace(/\/$/,"")}
+function escapeHtml(v){return String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function addMessage(text,who="ai"){const d=document.createElement("div");d.className="msg "+who;d.textContent=text;$("messages")?.appendChild(d);$("messages")?.lastElementChild?.scrollIntoView({behavior:"smooth",block:"end"})}
+function renderReminders(){$("reminders").innerHTML=reminders.map(r=>`<div class="reminder">⏰ <strong>${escapeHtml(r.text)}</strong><br><small>${new Date(r.time).toLocaleString()}</small></div>`).join("")}
+function renderMemory(){$("memoryList").innerHTML=memoryStore.map(m=>`<div class="memory-item">🧠 ${escapeHtml(m.content)}</div>`).join("")}
+function saveReminders(){localStorage.setItem("khaledReminders",JSON.stringify(reminders));renderReminders()}
+async function jsonPost(path,body){const r=await fetch(apiBase()+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok)throw new Error((await r.text())||"Request failed");return r.json()}
+async function health(){try{const r=await fetch(apiBase()+"/health");const d=await r.json();$("connectionBadge").textContent=d.aiConfigured?"AI online":"API online";$("connectionBadge").className="badge "+(d.aiConfigured?"ok":"");$("aiIntegration").textContent=d.aiConfigured?"Connected":"Needs key";$("apiStatus").textContent=d.aiConfigured?"Connected to Khaled AI API.":"API reachable, but AI key is not configured."}catch{$("connectionBadge").textContent="Offline";$("connectionBadge").className="badge error";$("aiIntegration").textContent="Offline";$("apiStatus").textContent="Could not reach the API."}}
+async function plan(text){try{return (await jsonPost("/v1/agent/plan",{text,context:"Current local time: "+new Date().toISOString()})).plan}catch{return null}}
+async function sendMessage(){
+ const input=$("userInput"),text=input?.value.trim();if(!text)return;input.value="";addMessage(text,"user");addMessage("Thinking…","ai");const pending=$("messages").lastElementChild;
+ const p=await plan(text);
+ try{
+  if(p?.action==="investment"){const d=await jsonPost("/v1/investments/analyze",{question:text});pending.textContent=d.answer||p.response;return}
+  if(p?.action==="reminder"&&p.reminder_at&&p.message){reminders.push({text:p.message,time:p.reminder_at,done:false});saveReminders();pending.textContent=p.response||"Reminder saved.";return}
+  if(p?.action==="translate"&&p.message){pending.textContent=p.message;return}
+  if(p?.action==="send_message"){pending.textContent="I prepared the message. Sending will be enabled when the corresponding WhatsApp/Apple connection is authorized.";return}
+  if(p?.response){pending.textContent=p.response;return}
+  const d=await jsonPost("/v1/chat",{text});pending.textContent=d.reply||"I couldn't get a response.";
+ }catch(e){pending.textContent="Khaled AI could not complete that request yet: "+e.message}
 }
-
-function renderReminders() {
-  const el = $("reminders");
-  if (!el) return;
-  el.innerHTML = reminders
-    .map(
-      (r) =>
-        `<div class="reminder">⏰ ${escapeHtml(r.text)}<br><small>${new Date(r.time).toLocaleString()}</small></div>`
-    )
-    .join("");
-}
-
-function renderMemory() {
-  const el = $("memoryList");
-  if (!el) return;
-  el.innerHTML = memoryStore
-    .map((m) => `<div class="reminder">${escapeHtml(m.content)}</div>`)
-    .join("");
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  }[c]));
-}
-
-function addMessage(text, who = "ai") {
-  const d = document.createElement("div");
-  d.className = "msg " + who;
-  d.textContent = text;
-  $("messages")?.appendChild(d);
-  if ($("messages")) $("messages").scrollTop = $("messages").scrollHeight;
-}
-
-function detectLanguage(text) {
-  if (/[\u0600-\u06FF]/.test(text)) return "ar";
-  if (/[ãõçáéíóúâêô]/i.test(text)) return "pt";
-  if (/\b(og|jeg|du|ikke|hva|det|skal|har)\b/i.test(text)) return "no";
-  return "en";
-}
-
-function localAssistantReply(text) {
-  const lang = detectLanguage(text);
-  return {
-    ar: "فهمت. أنا Khaled AI وسأتعامل تلقائياً مع اللغة والسياق.",
-    pt: "Entendi. Eu sou o Khaled AI e vou lidar automaticamente com o idioma e o contexto.",
-    no: "Jeg forstår. Jeg er Khaled AI og håndterer språk og kontekst automatisk.",
-    en: "I understand. I’m Khaled AI, and I’ll handle the language and context automatically."
-  }[lang];
-}
-
-async function tryLiveChat(text) {
-  try {
-    const base = localStorage.getItem("khaledApiUrl");
-    if (!base) return null;
-    const response = await fetch(base.replace(/\/$/, "") + "/v1/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.reply || null;
-  } catch {
-    return null;
-  }
-}
-
-async function tryAgentPlan(text) {
-  try {
-    const base = localStorage.getItem("khaledApiUrl");
-    if (!base) return null;
-    const response = await fetch(base.replace(/\/$/, "") + "/v1/agent/plan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, context: "Current local time: " + new Date().toISOString() })
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.plan || null;
-  } catch {
-    return null;
-  }
-}
-
-async function sendMessage() {
-  const input = $("userInput");
-  const text = input?.value.trim();
-  if (!text) return;
-  addMessage(text, "user");
-  input.value = "";
-  addMessage("…", "ai");
-  const messages = $("messages");
-  const pending = messages?.lastElementChild;
-  const plan = await tryAgentPlan(text);
-
-  if (plan?.action === "investment") {
-    const base = localStorage.getItem("khaledApiUrl");
-    let reply = plan.response || "I’m researching the current market data now.";
-    try {
-      const response = await fetch(base.replace(/\/$/, "") + "/v1/investments/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        reply = data.answer || reply;
-      }
-    } catch {}
-    if (pending) pending.textContent = reply;
-    else addMessage(reply, "ai");
-    return;
-  }
-
-  if (plan?.action === "reminder" && plan.reminder_at && plan.message) {
-    reminders.push({ text: plan.message, time: plan.reminder_at, done: false });
-    saveReminders();
-    if (pending) pending.textContent = plan.response || "Reminder saved.";
-    else addMessage(plan.response || "Reminder saved.", "ai");
-    if (Notification?.permission === "default") Notification.requestPermission();
-    return;
-  }
-
-  if (plan?.action === "translate" && plan.message) {
-    if (pending) pending.textContent = plan.message;
-    else addMessage(plan.message, "ai");
-    return;
-  }
-
-  if (plan?.action === "send_message") {
-    if (pending) pending.textContent = "I prepared the message, but I will ask for confirmation before sending it.";
-    else addMessage("I prepared the message, but I will ask for confirmation before sending it.", "ai");
-    return;
-  }
-
-  const reply = plan?.response || (await tryLiveChat(text)) || localAssistantReply(text);
-  if (pending) pending.textContent = reply;
-  else addMessage(reply, "ai");
-}
-
-$("sendBtn")?.addEventListener("click", sendMessage);
-$("userInput")?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
-});
-
-$("addReminder")?.addEventListener("click", () => {
-  const text = $("reminderText")?.value.trim();
-  const time = $("reminderTime")?.value;
-  if (!text || !time) {
-    alert("اكتب التذكير واختر الوقت");
-    return;
-  }
-  reminders.push({ text, time, done: false });
-  saveReminders();
-  $("reminderText").value = "";
-  $("reminderTime").value = "";
-  if (Notification?.permission === "default") Notification.requestPermission();
-});
-
-setInterval(() => {
-  const now = Date.now();
-  let changed = false;
-  reminders.forEach((r) => {
-    if (!r.done && new Date(r.time).getTime() <= now) {
-      r.done = true;
-      changed = true;
-      if (Notification?.permission === "granted") {
-        new Notification("Khaled AI", { body: r.text });
-      }
-      if ("speechSynthesis" in window) {
-        speechSynthesis.speak(new SpeechSynthesisUtterance(r.text));
-      }
-    }
-  });
-  if (changed) saveReminders();
-}, 15000);
-
-$("saveMemory")?.addEventListener("click", () => {
-  const text = $("memoryInput")?.value.trim();
-  if (!text) return;
-  memoryStore.push({
-    id: crypto.randomUUID(),
-    content: text,
-    createdAt: new Date().toISOString()
-  });
-  localStorage.setItem("khaledMemoryV1", JSON.stringify(memoryStore));
-  $("memoryInput").value = "";
-  renderMemory();
-});
-
-$("translateBtn")?.addEventListener("click", async () => {
-  const input = $("translateInput");
-  const result = $("translationResult");
-  const text = input?.value.trim();
-  if (!text || !result) return;
-  const translated = await tryLiveChat(
-    "Translate the following text naturally to the most appropriate target language. Return only the translation:\n\n" + text
-  );
-  result.textContent = translated || "The AI translation service is not connected yet.";
-});
-
-$("saveApiUrl")?.addEventListener("click", () => {
-  const value = $("apiUrl")?.value.trim().replace(/\/$/, "");
-  if (value) localStorage.setItem("khaledApiUrl", value);
-  else localStorage.removeItem("khaledApiUrl");
-  if ($("apiStatus")) $("apiStatus").textContent = value ? "Saved." : "Local API connection removed.";
-});
-
-if ($("apiUrl")) {
-  $("apiUrl").value = localStorage.getItem("khaledApiUrl") || "https://khaled-ai-api.onrender.com";
-  if ($("apiStatus")) $("apiStatus").textContent = "Ready.";
-}
-
-const tabs = [...document.querySelectorAll(".tab")];
-tabs.forEach((tab) =>
-  tab.addEventListener("click", () => {
-    tabs.forEach((t) => t.classList.remove("active"));
-    tab.classList.add("active");
-    const target = tab.dataset.section;
-    document.querySelectorAll("main > .card").forEach((section) => {
-      section.hidden = section.id !== target && !(target === "chat" && section.id === "chat");
-    });
-  })
-);
-
-renderReminders();
-renderMemory();
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
-}
+$("sendBtn").onclick=sendMessage;$("userInput").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}}
+document.querySelectorAll("[data-prompt]").forEach(b=>b.onclick=()=>{$("userInput").value=b.dataset.prompt;$("chat").hidden=false;sendMessage()});
+$("addReminder").onclick=()=>{const text=$("reminderText").value.trim(),time=$("reminderTime").value;if(!text||!time)return alert("Please enter a reminder and time.");reminders.push({text,time,done:false});saveReminders();$("reminderText").value="";$("reminderTime").value=""};
+$("saveMemory").onclick=()=>{const text=$("memoryInput").value.trim();if(!text)return;memoryStore.push({id:crypto.randomUUID(),content:text,createdAt:new Date().toISOString()});localStorage.setItem("khaledMemoryV1",JSON.stringify(memoryStore));$("memoryInput").value="";renderMemory()};
+$("translateBtn").onclick=async()=>{const text=$("translateInput").value.trim(),lang=$("targetLang").value;if(!text)return;const result=$("translationResult");result.textContent="Translating…";try{const d=await jsonPost("/v1/chat",{text:`Translate this naturally into ${lang==="pt"?"Brazilian Portuguese":lang==="no"?"Norwegian":lang==="ar"?"Arabic":"English"}. Return only the translation.\\n\\n${text}`});result.textContent=d.reply||"No translation returned."}catch(e){result.textContent=e.message}};
+$("saveApiUrl").onclick=()=>{const v=$("apiUrl").value.trim().replace(/\/$/,"");if(v)localStorage.setItem(API_KEY,v);else localStorage.removeItem(API_KEY);health()};
+document.querySelectorAll(".tab").forEach(tab=>tab.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));tab.classList.add("active");const target=tab.dataset.section;document.querySelectorAll("main>.card").forEach(s=>s.hidden=s.id!==target)});
+$("apiUrl").value=apiBase();renderReminders();renderMemory();health();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
