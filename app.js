@@ -69,7 +69,8 @@ async function callKhaledAPI(text){return null;}
 $('sendBtn').onclick=()=>{
   const text=$('userInput').value.trim(); if(!text)return;
   addMessage(text,'user'); $('userInput').value='';
-  addMessage(assistantReply(text));
+  const live=await tryLiveChat(text);
+  addMessage(live||assistantReply(text));
 };
 \nconst tabs=[...document.querySelectorAll('.tab')];
 tabs.forEach(tab=>tab.addEventListener('click',()=>{
