@@ -4,6 +4,39 @@ import { askOpenAI } from "./openai.js";
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
+function getWhatsAppConfig() {
+  return {
+    token: process.env.WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+    graphVersion: process.env.WHATSAPP_GRAPH_VERSION || "v23.0"
+  };
+}
+
+async function sendWhatsAppText(to, body) {
+  const { token, phoneNumberId, graphVersion } = getWhatsAppConfig();
+  if (!token || !phoneNumberId) throw new Error("WhatsApp is not configured");
+  const response = await fetch(
+    `https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "text",
+        text: { preview_url: false, body }
+      })
+    }
+  );
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error?.message || "WhatsApp send failed");
+  return data;
+}
+
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
@@ -57,9 +90,34 @@ app.get("/v1/webhooks/whatsapp", (req, res) => {
   return res.sendStatus(403);
 });
 
-app.post("/v1/webhooks/whatsapp", (req, res) => {
-  // WhatsApp event processing will be connected to the message/action pipeline next.
+app.post("/v1/webhooks/whatsapp", async (req, res) => {
+  // Acknowledge Meta quickly, then process inbound text messages.
   res.sendStatus(200);
+
+  try {
+    const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
+    for (const entry of entries) {
+      for (const change of entry.changes || []) {
+        const value = change.value || {};
+        for (const message of value.messages || []) {
+          if (message.type !== "text") continue;
+          const from = message.from;
+          const text = message.text?.body?.trim();
+          if (!from || !text) continue;
+
+          const reply = await askOpenAI({
+            input: text,
+            instructions:
+              "You are Khaled AI responding to a WhatsApp message on the user's behalf. Detect Arabic, Norwegian, English and Brazilian Portuguese automatically. Reply naturally and concisely. Do not claim to have taken an action unless it was actually performed."
+          });
+
+          await sendWhatsAppText(from, reply);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("WhatsApp webhook processing failed:", error);
+  }
 });
 
 app.listen(port, "0.0.0.0", () => {
