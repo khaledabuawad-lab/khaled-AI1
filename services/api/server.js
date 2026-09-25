@@ -1,5 +1,6 @@
 import express from "express";
 import { askOpenAI, planAction } from "./openai.js";
+import { analyzeInvestment } from "./investments.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -88,6 +89,22 @@ app.post("/v1/agent/plan", async (req, res) => {
   try {
     const plan = await planAction({ input: text, context });
     res.json({ plan });
+  } catch (error) {
+    const message = String(error?.message || error);
+    const status = message.includes("OPENAI_API_KEY") ? 503 : 502;
+    res.status(status).json({ error: message });
+  }
+});
+
+app.post("/v1/investments/analyze", async (req, res) => {
+  const question = String(req.body?.question || "").trim();
+  const portfolio = String(req.body?.portfolio || "").trim();
+  const watchlist = String(req.body?.watchlist || "").trim();
+  if (!question) return res.status(400).json({ error: "question is required" });
+
+  try {
+    const answer = await analyzeInvestment({ question, portfolio, watchlist });
+    res.json({ answer, currentData: true });
   } catch (error) {
     const message = String(error?.message || error);
     const status = message.includes("OPENAI_API_KEY") ? 503 : 502;
