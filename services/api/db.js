@@ -1,4 +1,4 @@
-import pg from "pg";
+import pg from "pg";\nimport crypto from "node:crypto";
 
 const { Pool } = pg;
 
@@ -48,6 +48,14 @@ export async function initDb() {
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS people_whatsapp_id_idx ON people(whatsapp_id) WHERE whatsapp_id IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS whatsapp_link_tokens (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS whatsapp_link_tokens_user_idx ON whatsapp_link_tokens(user_id, expires_at);
 
     CREATE TABLE IF NOT EXISTS reminders (
       id BIGSERIAL PRIMARY KEY,
@@ -158,4 +166,53 @@ export async function listPeople(userId, limit = 100) {
     [safeUserId, safeLimit]
   );
   return rows;
+}
+
+export async function createWhatsAppLinkToken(userId) {
+  const db = getPool();
+  if (!db) throw new Error("DATABASE_URL is not configured");
+  const safeUserId = requireUserId(userId);
+  const token = crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
+  const { rows } = await db.query(
+    "INSERT INTO whatsapp_link_tokens (token, user_id, expires_at) VALUES ($1,$2,NOW()+INTERVAL '15 minutes') RETURNING token, expires_at",
+    [token, safeUserId]
+  );
+  return rows[0];
+}
+
+export async function claimWhatsAppLinkToken(token, whatsappId) {
+  const db = getPool();
+  if (!db) throw new Error("DATABASE_URL is not configured");
+  const cleanToken = String(token || "").trim().toUpperCase();
+  const cleanWhatsappId = String(whatsappId || "").trim();
+  if (!cleanToken || !cleanWhatsappId) return null;
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const found = await client.query(
+      "SELECT token, user_id FROM whatsapp_link_tokens WHERE token=$1 AND expires_at > NOW() FOR UPDATE",
+      [cleanToken]
+    );
+    if (!found.rows[0]) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const userId = found.rows[0].user_id;
+    await client.query(
+      "DELETE FROM people WHERE whatsapp_id=$1",
+      [cleanWhatsappId]
+    );
+    await client.query(
+      "INSERT INTO people (user_id, name, phone, whatsapp_id, notes) VALUES ($1,$2,$3,$4,$5)",
+      [userId, "WhatsApp", cleanWhatsappId, cleanWhatsappId, "Linked to Khaled AI via secure link code"]
+    );
+    await client.query("DELETE FROM whatsapp_link_tokens WHERE token=$1", [cleanToken]);
+    await client.query("COMMIT");
+    return { userId, whatsappId: cleanWhatsappId };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
