@@ -136,6 +136,18 @@ export async function addPerson({ userId, name, phone = null, whatsappId = null,
   return rows[0];
 }
 
+export async function getPersonByWhatsAppId(whatsappId) {
+  const db = getPool();
+  if (!db) return null;
+  const id = String(whatsappId || "").trim();
+  if (!id) return null;
+  const { rows } = await db.query(
+    "SELECT id, user_id, name, phone, whatsapp_id, notes FROM people WHERE whatsapp_id = $1 LIMIT 1",
+    [id]
+  );
+  return rows[0] || null;
+}
+
 export async function listPeople(userId, limit = 100) {
   const db = getPool();
   if (!db) return [];
