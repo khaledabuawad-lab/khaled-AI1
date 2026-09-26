@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
-import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId } from "./db.js";
+import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId, createWhatsAppLinkToken, claimWhatsAppLinkToken } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -143,6 +143,15 @@ app.post("/v1/agent/plan", async (req, res) => {
   }
 });
 
+app.get("/v1/whatsapp/link-code", async (req, res) => {
+  try {
+    const link = await createWhatsAppLinkToken(req.user.id);
+    res.json({ ok: true, code: link.token, expiresAt: link.expires_at });
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
+  }
+});
+
 app.post("/v1/actions/execute", async (req, res) => {
   const action = String(req.body?.action || "");
   if (action === "send_message") {
@@ -240,6 +249,16 @@ app.post("/v1/webhooks/whatsapp", async (req, res) => {
           const from = message.from;
           const text = message.text?.body?.trim();
           if (!from || !text) continue;
+
+          const linkCode = text.match(/^KHALed[- ]?([A-Z0-9]{8,16})$/i)?.[1] || null;
+          if (linkCode) {
+            const linked = await claimWhatsAppLinkToken(linkCode, from);
+            if (linked) {
+              await sendWhatsAppText(from, "Khaled AI is now connected to this WhatsApp number. You can message me here normally.");
+              continue;
+            }
+          }
+
           const person = await getPersonByWhatsAppId(from);
           if (!person?.user_id) {
             console.warn("WhatsApp message ignored: number is not connected to a Khaled AI account", from);
