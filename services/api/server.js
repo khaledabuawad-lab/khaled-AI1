@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
-import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson } from "./db.js";
+import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -150,6 +150,8 @@ app.post("/v1/actions/execute", async (req, res) => {
     const message = String(req.body?.message || "").trim();
     if (!to || !message || message.length > 10000) return res.status(400).json({ error: "to and message are required" });
     try {
+      const person = await getPersonByWhatsAppId(to);
+      if (!person || person.user_id !== req.user.id) return res.status(403).json({ error: "WhatsApp recipient is not connected to this account" });
       const result = await sendWhatsAppText(to, message);
       return res.json({ ok: true, channel: "whatsapp", result });
     } catch (error) {
@@ -238,9 +240,16 @@ app.post("/v1/webhooks/whatsapp", async (req, res) => {
           const from = message.from;
           const text = message.text?.body?.trim();
           if (!from || !text) continue;
+          const person = await getPersonByWhatsAppId(from);
+          if (!person?.user_id) {
+            console.warn("WhatsApp message ignored: number is not connected to a Khaled AI account", from);
+            continue;
+          }
+          const memories = await listMemories(person.user_id, 50);
+          const memoryContext = memories.map((m) => "- " + m.content).join("\n") || "none";
           const reply = await askOpenAI({
             input: text,
-            instructions: "You are Khaled AI responding to a WhatsApp message on the user's behalf. Detect Arabic, Norwegian, English and Brazilian Portuguese automatically. Reply naturally and concisely. Do not claim to have taken an action unless it was actually performed."
+            instructions: "You are Khaled AI responding to a WhatsApp message on the user's behalf. Detect Arabic, Norwegian, English and Brazilian Portuguese automatically. Reply naturally and concisely. Do not claim to have taken an action unless it was actually performed.\nRelevant persistent memory:\n" + memoryContext
           });
           await sendWhatsAppText(from, reply);
         }
