@@ -181,6 +181,23 @@ export async function createWhatsAppLinkToken(userId) {
   return rows[0];
 }
 
+export async function getWhatsAppLinkStatus(token, userId) {
+  const db = getPool();
+  if (!db) throw new Error("DATABASE_URL is not configured");
+  const cleanToken = String(token || "").trim().toUpperCase();
+  const safeUserId = requireUserId(userId);
+  if (!cleanToken) return { error: "code required" };
+
+  const { rows } = await db.query(
+    "SELECT expires_at FROM whatsapp_link_tokens WHERE token=$1 AND user_id=$2",
+    [cleanToken, safeUserId]
+  );
+
+  if (!rows[0]) return { linked: true };
+  if (new Date(rows[0].expires_at) <= new Date()) return { expired: true };
+  return { linked: false };
+}
+
 export async function claimWhatsAppLinkToken(token, whatsappId) {
   const db = getPool();
   if (!db) throw new Error("DATABASE_URL is not configured");
