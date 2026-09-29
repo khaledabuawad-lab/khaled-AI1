@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
-import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId, createWhatsAppLinkToken, claimWhatsAppLinkToken } from "./db.js";
+import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId, createWhatsAppLinkToken, getWhatsAppLinkStatus, claimWhatsAppLinkToken } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -140,6 +140,18 @@ app.post("/v1/agent/plan", async (req, res) => {
   } catch (error) {
     const message = String(error?.message || error);
     res.status(message.includes("OPENAI_API_KEY") ? 503 : 502).json({ error: message });
+  }
+});
+
+app.get("/v1/whatsapp/link-status", async (req, res) => {
+  const code = String(req.query.code || "").replace(/^KHALED-/i, "").trim();
+  if (!code) return res.status(400).json({ error: "code required" });
+  try {
+    const status = await getWhatsAppLinkStatus(code, req.user.id);
+    if (status.error) return res.status(400).json({ error: status.error });
+    res.json(status);
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
   }
 });
 
