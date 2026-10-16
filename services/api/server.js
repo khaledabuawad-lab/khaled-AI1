@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
-import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId, createWhatsAppLinkToken, getWhatsAppLinkStatus, claimWhatsAppLinkToken } from "./db.js";
+import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId, createWhatsAppLinkToken, getWhatsAppLinkStatus, getWhatsAppConnectionStatus, claimWhatsAppLinkToken } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -145,11 +145,18 @@ app.post("/v1/agent/plan", async (req, res) => {
 
 app.get("/v1/whatsapp/link-status", async (req, res) => {
   const code = String(req.query.code || "").replace(/^KHALED-/i, "").trim();
-  if (!code) return res.status(400).json({ error: "code required" });
   try {
+    // Account-level status is authoritative; code is only relevant before first link.
     const status = await getWhatsAppLinkStatus(code, req.user.id);
-    if (status.error) return res.status(400).json({ error: status.error });
     res.json(status);
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
+  }
+});
+
+app.get("/v1/whatsapp/status", async (req, res) => {
+  try {
+    res.json(await getWhatsAppConnectionStatus(req.user.id));
   } catch (error) {
     res.status(503).json({ error: String(error?.message || error) });
   }
@@ -158,6 +165,7 @@ app.get("/v1/whatsapp/link-status", async (req, res) => {
 app.get("/v1/whatsapp/link-code", async (req, res) => {
   try {
     const link = await createWhatsAppLinkToken(req.user.id);
+    if (link.alreadyConnected) return res.json({ ok: true, linked: true, alreadyConnected: true });
     res.json({ ok: true, code: link.token, expiresAt: link.expires_at });
   } catch (error) {
     res.status(503).json({ error: String(error?.message || error) });
@@ -265,8 +273,12 @@ app.post("/v1/webhooks/whatsapp", async (req, res) => {
           const linkCode = text.match(/^KHALed[- ]?([A-Z0-9]{8,16})$/i)?.[1] || null;
           if (linkCode) {
             const linked = await claimWhatsAppLinkToken(linkCode, from);
-            if (linked) {
+            if (linked && !linked.conflict) {
               await sendWhatsAppText(from, "Khaled AI is now connected to this WhatsApp number. You can message me here normally.");
+              continue;
+            }
+            if (linked?.conflict) {
+              await sendWhatsAppText(from, "This WhatsApp number or Khaled AI account is already linked. No existing connection was changed. If you need help, open Khaled AI Settings.");
               continue;
             }
           }
