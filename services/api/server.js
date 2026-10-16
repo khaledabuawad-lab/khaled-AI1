@@ -283,18 +283,11 @@ app.post("/v1/webhooks/whatsapp", async (req, res) => {
             }
           }
 
-          const person = await getPersonByWhatsAppId(from);
-          if (!person?.user_id) {
-            console.warn("WhatsApp message ignored: number is not connected to a Khaled AI account", from);
-            continue;
-          }
-          const memories = await listMemories(person.user_id, 50);
-          const memoryContext = memories.map((m) => "- " + m.content).join("\n") || "none";
-          const reply = await askOpenAI({
-            input: text,
-            instructions: "You are Khaled AI responding to a WhatsApp message on the user's behalf. Detect Arabic, Norwegian, English and Brazilian Portuguese automatically. Reply naturally and concisely. Do not claim to have taken an action unless it was actually performed.\nRelevant persistent memory:\n" + memoryContext
-          });
-          await sendWhatsAppText(from, reply);
+          // Personal WhatsApp messages are intentionally not answered automatically.
+          // The connection code receives an acknowledgement above; all other messages
+          // are left for the account owner to read and answer themselves.
+          console.info("WhatsApp message received; automatic reply disabled.");
+          continue;
         }
       }
     }
