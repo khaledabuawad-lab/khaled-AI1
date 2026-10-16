@@ -1,4 +1,5 @@
 import express from "express";
+import { getWhatsAppConfig } from "./whatsapp-config.js";
 import crypto from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { askOpenAI, planAction } from "./openai.js";
@@ -32,13 +33,6 @@ async function authenticate(req, res, next) {
   }
 }
 
-function getWhatsAppConfig(env = process.env) {
-  return {
-    token: env.WHATSAPP_ACCESS_TOKEN,
-    phoneNumberId: env.WHATSAPP_PHONE_NUMBER || env.WHATSAPP_PHONE_NUMBER_ID,
-    graphVersion: env.WHATSAPP_GRAPH_VERSION || "v23.0"
-  };
-}
 
 async function sendWhatsAppText(to, body) {
   const { token, phoneNumberId, graphVersion } = getWhatsAppConfig();
