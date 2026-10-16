@@ -56,11 +56,20 @@ export async function initDb() {
     CREATE INDEX IF NOT EXISTS people_user_name_idx ON people(user_id, name);
     -- Migrate legacy link records without deleting or rewriting any existing contact.
     INSERT INTO whatsapp_connections (user_id, whatsapp_id, linked_at)
-    SELECT DISTINCT ON (user_id) user_id, whatsapp_id, COALESCE(updated_at, created_at, NOW())
-    FROM people
-    WHERE user_id IS NOT NULL AND whatsapp_id IS NOT NULL
-      AND notes = 'Linked to Khaled AI via secure link code'
-    ORDER BY user_id, updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+    SELECT DISTINCT ON (p.user_id) p.user_id, p.whatsapp_id, COALESCE(p.updated_at, p.created_at, NOW())
+    FROM people p
+    WHERE p.user_id IS NOT NULL AND p.whatsapp_id IS NOT NULL
+      AND p.notes = 'Linked to Khaled AI via secure link code'
+      -- Migrate only numbers that belong to one legacy account, never resolve ownership ambiguities by row order.
+      AND p.whatsapp_id IN (
+        SELECT whatsapp_id
+        FROM people
+        WHERE user_id IS NOT NULL AND whatsapp_id IS NOT NULL
+          AND notes = 'Linked to Khaled AI via secure link code'
+        GROUP BY whatsapp_id
+        HAVING COUNT(DISTINCT user_id) = 1
+      )
+    ORDER BY p.user_id, p.updated_at DESC NULLS LAST, p.created_at DESC NULLS LAST
     ON CONFLICT DO NOTHING;
   `);
   ready = true;
@@ -197,6 +206,14 @@ export async function claimWhatsAppLinkToken(token, whatsappId) {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["whatsapp-number:" + cleanWhatsappId]);
     const userConnection = await client.query("SELECT whatsapp_id FROM whatsapp_connections WHERE user_id = $1 FOR UPDATE", [userId]);
     const numberConnection = await client.query("SELECT user_id FROM whatsapp_connections WHERE whatsapp_id = $1 FOR UPDATE", [cleanWhatsappId]);
+    // Never let a new link claim a number already present in the legacy contacts table.
+    // Only explicit legacy link records are migrated to whatsapp_connections during initDb.
+    const legacyContact = await client.query("SELECT user_id, notes FROM people WHERE whatsapp_id = $1 LIMIT 1", [cleanWhatsappId]);
+    if (legacyContact.rows[0] && !(legacyContact.rows[0].user_id === userId && legacyContact.rows[0].notes === "Linked to Khaled AI via secure link code")) {
+      await client.query("DELETE FROM whatsapp_link_tokens WHERE token = $1", [cleanToken]);
+      await client.query("COMMIT");
+      return { conflict: true };
+    }
     if (userConnection.rows[0] || numberConnection.rows[0]) {
       const sameConnection = userConnection.rows[0]?.whatsapp_id === cleanWhatsappId && numberConnection.rows[0]?.user_id === userId;
       await client.query("DELETE FROM whatsapp_link_tokens WHERE token = $1", [cleanToken]);
