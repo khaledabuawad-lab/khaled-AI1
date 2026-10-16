@@ -1,14 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-// Keep this helper in sync with the backend's documented Render environment variable.
-function getWhatsAppConfig(env = process.env) {
-  return {
-    token: env.WHATSAPP_ACCESS_TOKEN,
-    phoneNumberId: env.WHATSAPP_PHONE_NUMBER || env.WHATSAPP_PHONE_NUMBER_ID,
-    graphVersion: env.WHATSAPP_GRAPH_VERSION || "v23.0"
-  };
-}
+import { getWhatsAppConfig } from "./whatsapp-config.js";
 
 test("uses the existing Render WHATSAPP_PHONE_NUMBER setting", () => {
   assert.equal(getWhatsAppConfig({ WHATSAPP_PHONE_NUMBER: "1291251750743033" }).phoneNumberId, "1291251750743033");
