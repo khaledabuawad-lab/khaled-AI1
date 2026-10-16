@@ -19,79 +19,50 @@ function getPool() {
   return pool;
 }
 
-export function isDatabaseConfigured() {
-  return Boolean(process.env.DATABASE_URL);
-}
+export function isDatabaseConfigured() { return Boolean(process.env.DATABASE_URL); }
 
 export async function initDb() {
   const db = getPool();
   if (!db) return false;
-
   await db.query(`
     CREATE TABLE IF NOT EXISTS memories (
-      id BIGSERIAL PRIMARY KEY,
-      user_id TEXT,
-      content TEXT NOT NULL,
-      category TEXT NOT NULL DEFAULT 'general',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      id BIGSERIAL PRIMARY KEY, user_id TEXT, content TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'general', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS people (
-      id BIGSERIAL PRIMARY KEY,
-      user_id TEXT,
-      name TEXT NOT NULL,
-      phone TEXT,
-      whatsapp_id TEXT,
-      notes TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      id BIGSERIAL PRIMARY KEY, user_id TEXT, name TEXT NOT NULL, phone TEXT,
+      whatsapp_id TEXT, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE UNIQUE INDEX IF NOT EXISTS people_whatsapp_id_idx ON people(whatsapp_id) WHERE whatsapp_id IS NOT NULL;
-
     CREATE TABLE IF NOT EXISTS whatsapp_link_tokens (
-      token TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      expires_at TIMESTAMPTZ NOT NULL,
+      token TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS whatsapp_link_tokens_user_idx ON whatsapp_link_tokens(user_id, expires_at);
-
     CREATE TABLE IF NOT EXISTS whatsapp_connections (
-      user_id TEXT PRIMARY KEY,
-      whatsapp_id TEXT NOT NULL UNIQUE,
-      linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      user_id TEXT PRIMARY KEY, whatsapp_id TEXT NOT NULL UNIQUE, linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS reminders (
-      id BIGSERIAL PRIMARY KEY,
-      user_id TEXT,
-      title TEXT NOT NULL,
-      remind_at TIMESTAMPTZ,
-      status TEXT NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id BIGSERIAL PRIMARY KEY, user_id TEXT, title TEXT NOT NULL, remind_at TIMESTAMPTZ,
+      status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     ALTER TABLE memories ADD COLUMN IF NOT EXISTS user_id TEXT;
     ALTER TABLE people ADD COLUMN IF NOT EXISTS user_id TEXT;
     ALTER TABLE reminders ADD COLUMN IF NOT EXISTS user_id TEXT;
-
     CREATE INDEX IF NOT EXISTS memories_user_updated_idx ON memories(user_id, updated_at DESC);
     CREATE INDEX IF NOT EXISTS reminders_user_status_time_idx ON reminders(user_id, status, remind_at);
     CREATE INDEX IF NOT EXISTS people_user_name_idx ON people(user_id, name);
-
-    -- Preserve existing links created by the previous implementation.
+    -- Migrate legacy link records without deleting or rewriting any existing contact.
     INSERT INTO whatsapp_connections (user_id, whatsapp_id, linked_at)
     SELECT DISTINCT ON (user_id) user_id, whatsapp_id, COALESCE(updated_at, created_at, NOW())
     FROM people
-    WHERE user_id IS NOT NULL
-      AND whatsapp_id IS NOT NULL
+    WHERE user_id IS NOT NULL AND whatsapp_id IS NOT NULL
       AND notes = 'Linked to Khaled AI via secure link code'
     ORDER BY user_id, updated_at DESC NULLS LAST, created_at DESC NULLS LAST
     ON CONFLICT DO NOTHING;
   `);
-
   ready = true;
   return true;
 }
@@ -107,44 +78,29 @@ export async function listMemories(userId, limit = 100) {
   if (!db) return [];
   const safeUserId = requireUserId(userId);
   const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
-  const { rows } = await db.query(
-    "SELECT id, content, category, created_at, updated_at FROM memories WHERE user_id = $1 ORDER BY updated_at DESC LIMIT $2",
-    [safeUserId, safeLimit]
-  );
+  const { rows } = await db.query("SELECT id, content, category, created_at, updated_at FROM memories WHERE user_id = $1 ORDER BY updated_at DESC LIMIT $2", [safeUserId, safeLimit]);
   return rows;
 }
 
 export async function addMemory({ userId, content, category = "general" }) {
   const db = getPool();
   if (!db) throw new Error("DATABASE_URL is not configured");
-  const safeUserId = requireUserId(userId);
-  const { rows } = await db.query(
-    "INSERT INTO memories (user_id, content, category) VALUES ($1, $2, $3) RETURNING id, content, category, created_at, updated_at",
-    [safeUserId, content, category]
-  );
+  const { rows } = await db.query("INSERT INTO memories (user_id, content, category) VALUES ($1, $2, $3) RETURNING id, content, category, created_at, updated_at", [requireUserId(userId), content, category]);
   return rows[0];
 }
 
 export async function listReminders(userId, limit = 100) {
   const db = getPool();
   if (!db) return [];
-  const safeUserId = requireUserId(userId);
   const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
-  const { rows } = await db.query(
-    "SELECT id, title, remind_at, status, created_at FROM reminders WHERE user_id = $1 ORDER BY COALESCE(remind_at, created_at) ASC LIMIT $2",
-    [safeUserId, safeLimit]
-  );
+  const { rows } = await db.query("SELECT id, title, remind_at, status, created_at FROM reminders WHERE user_id = $1 ORDER BY COALESCE(remind_at, created_at) ASC LIMIT $2", [requireUserId(userId), safeLimit]);
   return rows;
 }
 
 export async function addReminder({ userId, title, remindAt = null }) {
   const db = getPool();
   if (!db) throw new Error("DATABASE_URL is not configured");
-  const safeUserId = requireUserId(userId);
-  const { rows } = await db.query(
-    "INSERT INTO reminders (user_id, title, remind_at) VALUES ($1, $2, $3) RETURNING id, title, remind_at, status, created_at",
-    [safeUserId, title, remindAt]
-  );
+  const { rows } = await db.query("INSERT INTO reminders (user_id, title, remind_at) VALUES ($1, $2, $3) RETURNING id, title, remind_at, status, created_at", [requireUserId(userId), title, remindAt]);
   return rows[0];
 }
 
@@ -153,11 +109,7 @@ export function isDatabaseReady() { return ready; }
 export async function addPerson({ userId, name, phone = null, whatsappId = null, notes = null }) {
   const db = getPool();
   if (!db) throw new Error("DATABASE_URL is not configured");
-  const safeUserId = requireUserId(userId);
-  const { rows } = await db.query(
-    "INSERT INTO people (user_id, name, phone, whatsapp_id, notes) VALUES ($1,$2,$3,$4,$5) RETURNING id,name,phone,whatsapp_id,notes,created_at,updated_at",
-    [safeUserId, name, phone, whatsappId, notes]
-  );
+  const { rows } = await db.query("INSERT INTO people (user_id, name, phone, whatsapp_id, notes) VALUES ($1,$2,$3,$4,$5) RETURNING id,name,phone,whatsapp_id,notes,created_at,updated_at", [requireUserId(userId), name, phone, whatsappId, notes]);
   return rows[0];
 }
 
@@ -166,45 +118,26 @@ export async function getPersonByWhatsAppId(whatsappId) {
   if (!db) return null;
   const id = String(whatsappId || "").trim();
   if (!id) return null;
-  const { rows } = await db.query(
-    "SELECT id, user_id, name, phone, whatsapp_id, notes FROM people WHERE whatsapp_id = $1 LIMIT 1",
-    [id]
-  );
-  return rows[0] || null;
-}
-
-export async function getWhatsAppConnectionByWhatsAppId(whatsappId) {
-  const db = getPool();
-  if (!db) return null;
-  const id = String(whatsappId || "").trim();
-  if (!id) return null;
-  const { rows } = await db.query(
-    "SELECT user_id, whatsapp_id, linked_at FROM whatsapp_connections WHERE whatsapp_id = $1 LIMIT 1",
-    [id]
-  );
+  const connection = await db.query("SELECT user_id, whatsapp_id, linked_at FROM whatsapp_connections WHERE whatsapp_id = $1 LIMIT 1", [id]);
+  if (connection.rows[0]) {
+    return { id: null, user_id: connection.rows[0].user_id, name: "WhatsApp", phone: id, whatsapp_id: id, notes: "Linked to Khaled AI", created_at: connection.rows[0].linked_at, updated_at: connection.rows[0].linked_at };
+  }
+  const { rows } = await db.query("SELECT id, user_id, name, phone, whatsapp_id, notes FROM people WHERE whatsapp_id = $1 LIMIT 1", [id]);
   return rows[0] || null;
 }
 
 export async function getWhatsAppConnectionStatus(userId) {
   const db = getPool();
   if (!db) throw new Error("DATABASE_URL is not configured");
-  const safeUserId = requireUserId(userId);
-  const { rows } = await db.query(
-    "SELECT linked_at FROM whatsapp_connections WHERE user_id = $1 LIMIT 1",
-    [safeUserId]
-  );
+  const { rows } = await db.query("SELECT linked_at FROM whatsapp_connections WHERE user_id = $1 LIMIT 1", [requireUserId(userId)]);
   return { linked: Boolean(rows[0]), ...(rows[0] ? { linkedAt: rows[0].linked_at } : {}) };
 }
 
 export async function listPeople(userId, limit = 100) {
   const db = getPool();
   if (!db) return [];
-  const safeUserId = requireUserId(userId);
   const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
-  const { rows } = await db.query(
-    "SELECT id,name,phone,whatsapp_id,notes,created_at,updated_at FROM people WHERE user_id = $1 ORDER BY name ASC LIMIT $2",
-    [safeUserId, safeLimit]
-  );
+  const { rows } = await db.query("SELECT id,name,phone,whatsapp_id,notes,created_at,updated_at FROM people WHERE user_id = $1 ORDER BY name ASC LIMIT $2", [requireUserId(userId), safeLimit]);
   return rows;
 }
 
@@ -216,21 +149,14 @@ export async function createWhatsAppLinkToken(userId) {
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["whatsapp-user:" + safeUserId]);
-    const existing = await client.query(
-      "SELECT whatsapp_id FROM whatsapp_connections WHERE user_id = $1 LIMIT 1",
-      [safeUserId]
-    );
+    const existing = await client.query("SELECT whatsapp_id FROM whatsapp_connections WHERE user_id = $1 LIMIT 1", [safeUserId]);
     if (existing.rows[0]) {
       await client.query("COMMIT");
       return { alreadyConnected: true };
     }
-
     await client.query("DELETE FROM whatsapp_link_tokens WHERE user_id = $1", [safeUserId]);
     const token = crypto.randomBytes(8).toString("hex").toUpperCase();
-    const { rows } = await client.query(
-      "INSERT INTO whatsapp_link_tokens (token, user_id, expires_at) VALUES ($1,$2,NOW()+INTERVAL '15 minutes') RETURNING token, expires_at",
-      [token, safeUserId]
-    );
+    const { rows } = await client.query("INSERT INTO whatsapp_link_tokens (token, user_id, expires_at) VALUES ($1,$2,NOW()+INTERVAL '15 minutes') RETURNING token, expires_at", [token, safeUserId]);
     await client.query("COMMIT");
     return rows[0];
   } catch (error) {
@@ -244,20 +170,12 @@ export async function createWhatsAppLinkToken(userId) {
 export async function getWhatsAppLinkStatus(token, userId) {
   const db = getPool();
   if (!db) throw new Error("DATABASE_URL is not configured");
-  const cleanToken = String(token || "").trim().toUpperCase();
   const safeUserId = requireUserId(userId);
-  const connection = await db.query(
-    "SELECT 1 FROM whatsapp_connections WHERE user_id = $1 LIMIT 1",
-    [safeUserId]
-  );
+  const connection = await db.query("SELECT 1 FROM whatsapp_connections WHERE user_id = $1 LIMIT 1", [safeUserId]);
   if (connection.rows[0]) return { linked: true };
-  if (!cleanToken) return { error: "code required" };
-
-  const { rows } = await db.query(
-    "SELECT expires_at FROM whatsapp_link_tokens WHERE token=$1 AND user_id=$2",
-    [cleanToken, safeUserId]
-  );
-
+  const cleanToken = String(token || "").trim().toUpperCase();
+  if (!cleanToken) return { linked: false };
+  const { rows } = await db.query("SELECT expires_at FROM whatsapp_link_tokens WHERE token=$1 AND user_id=$2", [cleanToken, safeUserId]);
   if (!rows[0]) return { linked: false, invalid: true };
   if (new Date(rows[0].expires_at) <= new Date()) return { linked: false, expired: true };
   return { linked: false, expired: false };
@@ -269,51 +187,24 @@ export async function claimWhatsAppLinkToken(token, whatsappId) {
   const cleanToken = String(token || "").trim().toUpperCase();
   const cleanWhatsappId = String(whatsappId || "").trim();
   if (!cleanToken || !cleanWhatsappId) return null;
-
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const found = await client.query(
-      "SELECT token, user_id FROM whatsapp_link_tokens WHERE token=$1 AND expires_at > NOW() FOR UPDATE",
-      [cleanToken]
-    );
-    if (!found.rows[0]) {
-      await client.query("ROLLBACK");
-      return null;
-    }
-
+    const found = await client.query("SELECT token, user_id FROM whatsapp_link_tokens WHERE token=$1 AND expires_at > NOW() FOR UPDATE", [cleanToken]);
+    if (!found.rows[0]) { await client.query("ROLLBACK"); return null; }
     const userId = found.rows[0].user_id;
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["whatsapp-user:" + userId]);
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["whatsapp-number:" + cleanWhatsappId]);
-
-    const [userConnection, numberConnection] = await Promise.all([
-      client.query("SELECT whatsapp_id FROM whatsapp_connections WHERE user_id = $1 FOR UPDATE", [userId]),
-      client.query("SELECT user_id FROM whatsapp_connections WHERE whatsapp_id = $1 FOR UPDATE", [cleanWhatsappId])
-    ]);
-
+    const userConnection = await client.query("SELECT whatsapp_id FROM whatsapp_connections WHERE user_id = $1 FOR UPDATE", [userId]);
+    const numberConnection = await client.query("SELECT user_id FROM whatsapp_connections WHERE whatsapp_id = $1 FOR UPDATE", [cleanWhatsappId]);
     if (userConnection.rows[0] || numberConnection.rows[0]) {
-      const sameConnection = userConnection.rows[0]?.whatsapp_id === cleanWhatsappId
-        && numberConnection.rows[0]?.user_id === userId;
-      if (sameConnection) {
-        await client.query("DELETE FROM whatsapp_link_tokens WHERE token = $1", [cleanToken]);
-        await client.query("COMMIT");
-        return { userId, whatsappId: cleanWhatsappId, alreadyLinked: true };
-      }
-
-      // Consume a code used in a conflicting claim; never remove or transfer an existing link.
+      const sameConnection = userConnection.rows[0]?.whatsapp_id === cleanWhatsappId && numberConnection.rows[0]?.user_id === userId;
       await client.query("DELETE FROM whatsapp_link_tokens WHERE token = $1", [cleanToken]);
       await client.query("COMMIT");
-      return { conflict: true };
+      return sameConnection ? { userId, whatsappId: cleanWhatsappId, alreadyLinked: true } : { conflict: true };
     }
-
-    await client.query(
-      "INSERT INTO whatsapp_connections (user_id, whatsapp_id) VALUES ($1, $2)",
-      [userId, cleanWhatsappId]
-    );
-    await client.query(
-      "DELETE FROM whatsapp_link_tokens WHERE user_id = $1",
-      [userId]
-    );
+    await client.query("INSERT INTO whatsapp_connections (user_id, whatsapp_id) VALUES ($1, $2)", [userId, cleanWhatsappId]);
+    await client.query("DELETE FROM whatsapp_link_tokens WHERE user_id = $1", [userId]);
     await client.query("COMMIT");
     return { userId, whatsappId: cleanWhatsappId };
   } catch (error) {
