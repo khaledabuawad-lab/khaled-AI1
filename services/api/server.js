@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { askOpenAI, planAction } from "./openai.js";
 import { analyzeInvestment } from "./investments.js";
-import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId, createWhatsAppLinkToken, getWhatsAppLinkStatus, claimWhatsAppLinkToken } from "./db.js";
+import { initDb, isDatabaseConfigured, isDatabaseReady, listMemories, addMemory, listReminders, addReminder, listPeople, addPerson, getPersonByWhatsAppId, createWhatsAppLinkToken, getWhatsAppLinkStatus, getWhatsAppConnectionStatus, claimWhatsAppLinkToken } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -32,11 +32,11 @@ async function authenticate(req, res, next) {
   }
 }
 
-function getWhatsAppConfig() {
+function getWhatsAppConfig(env = process.env) {
   return {
-    token: process.env.WHATSAPP_ACCESS_TOKEN,
-    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
-    graphVersion: process.env.WHATSAPP_GRAPH_VERSION || "v23.0"
+    token: env.WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: env.WHATSAPP_PHONE_NUMBER || env.WHATSAPP_PHONE_NUMBER_ID,
+    graphVersion: env.WHATSAPP_GRAPH_VERSION || "v23.0"
   };
 }
 
@@ -145,11 +145,18 @@ app.post("/v1/agent/plan", async (req, res) => {
 
 app.get("/v1/whatsapp/link-status", async (req, res) => {
   const code = String(req.query.code || "").replace(/^KHALED-/i, "").trim();
-  if (!code) return res.status(400).json({ error: "code required" });
   try {
+    // Account-level status is authoritative; code is only relevant before first link.
     const status = await getWhatsAppLinkStatus(code, req.user.id);
-    if (status.error) return res.status(400).json({ error: status.error });
     res.json(status);
+  } catch (error) {
+    res.status(503).json({ error: String(error?.message || error) });
+  }
+});
+
+app.get("/v1/whatsapp/status", async (req, res) => {
+  try {
+    res.json(await getWhatsAppConnectionStatus(req.user.id));
   } catch (error) {
     res.status(503).json({ error: String(error?.message || error) });
   }
@@ -158,6 +165,7 @@ app.get("/v1/whatsapp/link-status", async (req, res) => {
 app.get("/v1/whatsapp/link-code", async (req, res) => {
   try {
     const link = await createWhatsAppLinkToken(req.user.id);
+    if (link.alreadyConnected) return res.json({ ok: true, linked: true, alreadyConnected: true });
     res.json({ ok: true, code: link.token, expiresAt: link.expires_at });
   } catch (error) {
     res.status(503).json({ error: String(error?.message || error) });
@@ -265,24 +273,21 @@ app.post("/v1/webhooks/whatsapp", async (req, res) => {
           const linkCode = text.match(/^KHALed[- ]?([A-Z0-9]{8,16})$/i)?.[1] || null;
           if (linkCode) {
             const linked = await claimWhatsAppLinkToken(linkCode, from);
-            if (linked) {
-              await sendWhatsAppText(from, "Khaled AI is now connected to this WhatsApp number. You can message me here normally.");
+            if (linked && !linked.conflict) {
+              await sendWhatsAppText(from, "Khaled AI is now connected to this WhatsApp number. Automatic replies are disabled.");
+              continue;
+            }
+            if (linked?.conflict) {
+              await sendWhatsAppText(from, "This WhatsApp number or Khaled AI account is already linked. No existing connection was changed. If you need help, open Khaled AI Settings.");
               continue;
             }
           }
 
-          const person = await getPersonByWhatsAppId(from);
-          if (!person?.user_id) {
-            console.warn("WhatsApp message ignored: number is not connected to a Khaled AI account", from);
-            continue;
-          }
-          const memories = await listMemories(person.user_id, 50);
-          const memoryContext = memories.map((m) => "- " + m.content).join("\n") || "none";
-          const reply = await askOpenAI({
-            input: text,
-            instructions: "You are Khaled AI responding to a WhatsApp message on the user's behalf. Detect Arabic, Norwegian, English and Brazilian Portuguese automatically. Reply naturally and concisely. Do not claim to have taken an action unless it was actually performed.\nRelevant persistent memory:\n" + memoryContext
-          });
-          await sendWhatsAppText(from, reply);
+          // Personal WhatsApp messages are intentionally not answered automatically.
+          // The connection code receives an acknowledgement above; all other messages
+          // are left for the account owner to read and answer themselves.
+          console.info("WhatsApp message received; automatic reply disabled.");
+          continue;
         }
       }
     }
