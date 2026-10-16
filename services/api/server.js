@@ -35,7 +35,9 @@ async function authenticate(req, res, next) {
 function getWhatsAppConfig() {
   return {
     token: process.env.WHATSAPP_ACCESS_TOKEN,
-    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+    // Render currently stores the production Phone Number ID under WHATSAPP_PHONE_NUMBER.
+    // Keep the older variable as a backward-compatible fallback.
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER || process.env.WHATSAPP_PHONE_NUMBER_ID,
     graphVersion: process.env.WHATSAPP_GRAPH_VERSION || "v23.0"
   };
 }
@@ -274,7 +276,7 @@ app.post("/v1/webhooks/whatsapp", async (req, res) => {
           if (linkCode) {
             const linked = await claimWhatsAppLinkToken(linkCode, from);
             if (linked && !linked.conflict) {
-              await sendWhatsAppText(from, "Khaled AI is now connected to this WhatsApp number. You can message me here normally.");
+              await sendWhatsAppText(from, "Khaled AI is now connected to this WhatsApp number. Automatic replies are disabled.");
               continue;
             }
             if (linked?.conflict) {
